@@ -1,0 +1,1 @@
+scp jazzitup@gate2.sscc.uos.ac.kr:/home/jazzitup/analysis/quarkonia/skimmedFiles/*.root .

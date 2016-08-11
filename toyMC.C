@@ -33,23 +33,45 @@ void toyMC(
 	    ) 
 {
   using namespace RooFit;
+  RooRandom::randomGenerator()->SetSeed(111);
   gStyle->SetEndErrorSize(0);
+  float Val_2S_1S_nom = 0;
+  float Val_2S_1S_gen = 0;
+  float Dev_2S_1S = 0;
+  
+
+  TString fcoll;
+  TString finput;
+  if(collId == kAADATA) fcoll = "AA";
+  else if(collId == kPPDATA) fcoll = "PP";
+  if(inputOption == 3) finput = "4th poly";
+  else if(inputOption == 4) finput = "Nominal+Exp";
+  
+  TFile *wf = new TFile(Form("%s_fit_pt%.1f-%.1f_rap%.1f-%.1f_cent%d-%d_Gen%d_input%d_useCentBkg%d_nToys%d.root",fcoll.Data(),ptLow,ptHigh,yLow,yHigh,cLow,cHigh,nGen,inputOption,useCentIntBkgShape,nToys),"recreate");
+  
+  TH1D *h1 = new TH1D("h1",Form("SR Nominal, %d toys, %d events, cent %d-%d;2S/1S nom;Counts",nToys,nGen,cLow,cHigh),100,0,1);
+  TH1D *h2 = new TH1D("h2",Form("SR %s, %d toys, %d events, cent %d-%d;2S/1S nom;Counts",finput.Data(),nToys,nGen,cLow,cHigh),100,0,1);
+  TH1D *h3 = new TH1D("h3","Deviation;2S/1S dev;Counts",10000,0,100);
+
+  //----****************--------for loop -----*******************-----------------
+  //----****************--------for loop -----*******************-----------------
+  //----****************--------for loop -----*******************-----------------
+  //----****************--------for loop -----*******************-----------------
+  //----****************--------for loop -----*******************-----------------
+  
+  for(int i=0;i<nToys;i++){
   
   float massLow = 8. ;
   float massHigh = 14.;
   int   nMassBin  = (massHigh-massLow)*10;
   
   RooWorkspace *ws = new RooWorkspace("ws");
+  RooWorkspace *wsinp = new RooWorkspace("wsinp");
 
   RooRealVar mass("mass","mass", massLow, massHigh);
   ws->import(mass);
+  wsinp->import(mass);
   mass.Print();
-  
-  TString fcoll;
-  if(collId == kAADATA) fcoll = "AA";
-  else if(collId == kPPDATA) fcoll = "PP";
-  
-  TFile *wf = new TFile(Form("%s_fit_Gen%d_input%d_useCentBkg%d_nToys%d.root",fcoll.Data(),nGen,inputOption,useCentIntBkgShape,nToys),"recreate");
   
 
   RooRealVar mRatio21("mRatio21","mRatio21",pdgMass.Y2S / pdgMass.Y1S );
@@ -185,9 +207,9 @@ void toyMC(
   RooRealVar *nSig2sInp  = new RooRealVar("nSig2sInp","nSig2sInp", nGen * r2S_overTot, 0,   nGen);
   RooRealVar *nBkgInp  = new RooRealVar("nBkgInp","n_bkgInp",      nGen * rBkg_overTot,  0,   nGen);
   
-  nSig1sInp->setConstant();
-  nSig2sInp->setConstant();
-  nBkgInp->setConstant();
+//  nSig1sInp->setConstant();
+//  nSig2sInp->setConstant();
+//  nBkgInp->setConstant();
 
 
 
@@ -204,25 +226,8 @@ void toyMC(
   else if (inputOption == kErrExpExp ) {
     modelInput = new RooAddPdf("modelInput","1S+2S + Bkg",RooArgList(*cb1s, *cb2s, *bkgComp4),RooArgList(*nSig1sInp,*nSig2sInp,*nBkgInp));
   }
-  //ws->import(*modelInput);
+  wsinp->import(*modelInput);
 
-  TH1D *h1 = new TH1D("h1",";2S/1S nom;Counts",100,0,1);
-  TH1D *h2 = new TH1D("h2",";2S/1S gen;Counts",100,0,1);
-  TH1D *h3 = new TH1D("h3",";2S/1S dev;Counts",10000,0,100);
-
-  float Val_2S_1S_nom = 0;
-  float Val_2S_1S_gen = 0;
-  float Dev_2S_1S = 0;
-  
-  RooRandom::randomGenerator()->SetSeed(111);
-
-  //----****************--------for loop -----*******************-----------------
-  //----****************--------for loop -----*******************-----------------
-  //----****************--------for loop -----*******************-----------------
-  //----****************--------for loop -----*******************-----------------
-  //----****************--------for loop -----*******************-----------------
-  
-  for(int i=0;i<nToys;i++){
   Val_2S_1S_nom=0;
   Val_2S_1S_gen=0;
   Dev_2S_1S=0;
@@ -236,7 +241,7 @@ void toyMC(
   xframe->GetYaxis()->CenterTitle();
   RooPlot* xframe2 = (RooPlot*)xframe->Clone("xframe2");
 
-  //  RooFitResult* fitResInput = modelInput->fitTo(*data,Save(), Hesse(kTRUE),Range(massLow, massHigh),Minos(0), SumW2Error(kTRUE));
+  RooFitResult* fitResInput = wsinp->pdf("modelInput")->fitTo(*data,Save(), Hesse(kTRUE),Range(massLow, massHigh),Minos(0), SumW2Error(kTRUE));
 
   data->plotOn(xframe,Name("dataHist"),MarkerSize(0.7)) ;
   modelInput->plotOn(xframe, LineColor(kBlack), Name("inputModelHist")) ;
@@ -313,14 +318,14 @@ void toyMC(
   ws->pdf("modelOutput")->plotOn(xframe2, Components(RooArgSet(*bkgFitOut)),LineColor(kBlack),LineStyle(kDashed));
   
   Val_2S_1S_nom = (float)(ws->var("nSig2sOut")->getVal() / ws->var("nSig1sOut")->getVal());
-  Val_2S_1S_gen = (float)(nSig2sInp->getVal() / nSig1sInp->getVal());
+  Val_2S_1S_gen = (float)(wsinp->var("nSig2sInp")->getVal() / wsinp->var("nSig1sInp")->getVal());
   Dev_2S_1S = (Val_2S_1S_gen/Val_2S_1S_nom - 1) * 100;
   h1->Fill(Val_2S_1S_nom);
   h2->Fill(Val_2S_1S_gen);
   h3->Fill(Dev_2S_1S);
 
   // DRAW! 
-/*
+  if(nToys == 1){
   TCanvas* c1 =  new TCanvas("canvas2","My plots",4,45,800,400);
   c1->cd();
   TPad *pad1 = new TPad("pad1", "pad1", 0, 0.25, 0.49, 1.0);
@@ -329,7 +334,7 @@ void toyMC(
   pad1->SetBottomMargin(0); // Upper and lower plot are joined
 
   xframe->GetYaxis()->SetTitleOffset(1.4) ; xframe->Draw() ;
-  drawText(Form("#Upsilon(2S)/#Upsilon(1S) = %.5f",(float)(nSig2sInp->getVal() / nSig1sInp->getVal())),0.4,0.74,1,16) ;
+  drawText(Form("#Upsilon(2S)/#Upsilon(1S) = %.5f",(float)(wsinp->var("nSig2sInp")->getVal() / wsinp->var("nSig1sInp")->getVal())),0.4,0.74,1,16) ;
   
   if (inputOption==kChPol4 ) 
     drawText("4th order poly. Bkg.",0.4,0.82,2,15) ;
@@ -354,6 +359,15 @@ void toyMC(
   //  tex->SetTextAngle(180);
   tex->Draw();
 
+  RooArgList paramListinp = fitResInput->floatParsFinal();
+  paramListinp.Print("v");
+  RooPlot* legFrameinp = wsinp->var("mass")->frame(Name("Fit Results"), Title("Fit Results"));
+  wsinp->pdf("modelInput")->paramOn(legFrameinp,Layout(.6,.9, .5),Parameters(paramListinp));
+  legFrameinp->getAttText()->SetTextAlign(11);
+  legFrameinp->getAttText()->SetTextSize(0.028);
+  TPaveText* hhinp = (TPaveText*)legFrameinp->findObject(Form("%s_paramBox",wsinp->pdf("modelInput")->GetName()));
+  hhinp->SetY1(0.35); hhinp->SetY2(0.83);
+  hhinp->Draw();
   // PULL
 
   TPad *pad2 = new TPad("pad2", "pad2", 0, 0.05, 0.49, 0.25);
@@ -361,7 +375,7 @@ void toyMC(
   pad2->Draw();
   pad2->cd();
   RooHist* hpull = xframe->pullHist("dataHist","inputModelHist");
-  RooPlot* pullFrame = ws->var("mass")->frame(Title("Pull Distribution")) ;
+  RooPlot* pullFrame = wsinp->var("mass")->frame(Title("Pull Distribution")) ;
   pullFrame->addPlotable(hpull,"P") ;
   pullFrame->SetTitleSize(2.57);
   pullFrame->GetYaxis()->SetTitleOffset(1.8) ;
@@ -419,17 +433,18 @@ void toyMC(
 
 
   // *~*~*~*~*~*~*~* Print the results *~*~*~*~*~*~*~* //
-*/
-  cout << "nSig2sInp/nSig1sInp = " << nSig2sInp->getVal() / nSig1sInp->getVal() << endl;
-  cout << "output ratio =        " << ws->var("nSig2sOut")->getVal() / ws->var("nSig1sOut")->getVal() << endl;
-  //c1->SaveAs(Form( "toyMCFit_collId%d_pt%.0f-%.0fGeV_y%.0f-%.0f_cBin%d-%d_muPtCut%.0fGeV_BkgPDFOpt%d_nGen%d_useCentIntBkgShape%d.png",
-		//   collId, ptLow, ptHigh, yLow*10, yHigh*10, cLow, cHigh, muPtCut, inputOption, nGen,useCentIntBkgShape) );
+
+  //cout << "nSig2sInp/nSig1sInp = " << nSig2sInp->getVal() / nSig1sInp->getVal() << endl;
+  cout << "input fit ratio = " << wsinp->var("nSig2sInp")->getVal() / wsinp->var("nSig1sInp")->getVal() << endl;
+  cout << "output fit ratio = " << ws->var("nSig2sOut")->getVal() / ws->var("nSig1sOut")->getVal() << endl;
+  c1->SaveAs(Form( "toyMCFit_collId%d_pt%.0f-%.0fGeV_y%.0f-%.0f_cBin%d-%d_muPtCut%.0fGeV_BkgPDFOpt%d_nGen%d_useCentIntBkgShape%d.png",
+		   collId, ptLow, ptHigh, yLow*10, yHigh*10, cLow, cHigh, muPtCut, inputOption, nGen,useCentIntBkgShape) );
   
-  float r1 =  nSig2sInp->getVal() / nSig1sInp->getVal() ; 
+  float r1 =  wsinp->var("nSig2sInp")->getVal() / wsinp->var("nSig1sInp")->getVal() ; 
   float r2 =  ws->var("nSig2sOut")->getVal() / ws->var("nSig1sOut")->getVal() ; 
   cout << Form( "collId: %d,    pt: %.0f - %.0fGeV,   y: %.1f - %.1f,  cBin: %d - %d", collId, ptLow, ptHigh, yLow, yHigh, cLow, cHigh ) << endl;
   cout << "Uncertainty = "  << (r2 - r1 ) / r1 << endl;
-  
+  }  
   
   }
 
